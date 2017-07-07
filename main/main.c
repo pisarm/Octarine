@@ -46,11 +46,10 @@ void app_main() {
         xTaskCreate(ap_task, "ap_task", 2048, (void *) 0, 10, NULL);
         xTaskCreatePinnedToCore(mongoose_ap_task, "mongoose_ap_task", 20480, NULL, 5, NULL, 0);
     } else {
-        printf("Found %s: %s\n", ssid, password);
+        xTaskCreate(sntp_task, "sntp_task", 2048, (void *) 0, 10, NULL);
+        xTaskCreatePinnedToCore(&mongoose_task, "mongoose_task", 20480, NULL, 5, NULL, 0);
 
         setup_wifi(ssid, password);
-
-        xTaskCreate(sntp_task, "sntp_task", 2048, (void*) 0, 10, NULL);
     }
 }
 
@@ -62,9 +61,6 @@ static void setup_wifi(char *ssid, char *password) {
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
     ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
-
-    printf("%s\n", ssid);
-    printf("%s\n", password);
 
     wifi_config_t wifi_config;
     memcpy(wifi_config.sta.ssid, ssid, 32);
@@ -101,8 +97,7 @@ static esp_err_t wifi_event_handler(void *ctx, system_event_t *event) {
 
     case SYSTEM_EVENT_STA_GOT_IP:
         xEventGroupSetBits(event_group, WIFI_CONNECTED_BIT);
-        // xTaskCreate(mongoose_task, "mongoose_task", 20480, (void*) 0, 10, NULL);
-        xTaskCreatePinnedToCore(&mongoose_task, "mongoose_task", 20480, NULL, 5, NULL, 0); //TODO: move to main - and let it wait for connection bit
+
         break;
 
     case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -168,6 +163,8 @@ static void sntp_task(void* args) {
 }
 
 static void mongoose_task(void *data) {
+    xEventGroupWaitBits(event_group, WIFI_CONNECTED_BIT, false, true, portMAX_DELAY);
+    
 	struct mg_mgr mgr;
 	mg_mgr_init(&mgr, NULL);
 
