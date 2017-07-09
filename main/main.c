@@ -1,14 +1,16 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
-#include <u8g2.h>
 #include "apps/sntp/sntp.h"
-#include "endpoints.h"
 #include "esp_event_loop.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "mongoose.h"
 #include "nvs_flash.h"
+#include "esp_log.h"
+
+#include "display.h"
+#include "endpoints.h"
 #include "storage.h"
 
 const int WIFI_CONNECTED_BIT = BIT0;
@@ -26,15 +28,18 @@ static void ap_task(void *args);
 static void sntp_task(void* args);
 static void mongoose_task(void *data);
 static void mongoose_ap_task(void *data);
+static void display_time_task(void *data);
 
 static esp_err_t wifi_event_handler(void *ctx, system_event_t *event);
 static void mongoose_event_handler(struct mg_connection *nc, int ev, void *evData);
-
 
 // Main
 
 void app_main() {
     nvs_flash_init();
+
+    display_init();    
+    display_draw_center("Octarine");
 
     event_group = xEventGroupCreate();
 
@@ -43,9 +48,10 @@ void app_main() {
 
     // Wifi credentials not found - starting up AP
     if (get_wifi_settings(ssid, password) != ESP_OK) {
-        xTaskCreate(ap_task, "ap_task", 2048, (void *) 0, 10, NULL);
+        xTaskCreate(ap_task, "ap_task", 2048, (void *) 0, 10, NULL);        
         xTaskCreatePinnedToCore(mongoose_ap_task, "mongoose_ap_task", 20480, NULL, 5, NULL, 0);
     } else {
+        xTaskCreate(display_time_task, "display_time_task", 2048, (void *) 0, 10, NULL);
         xTaskCreate(sntp_task, "sntp_task", 2048, (void *) 0, 10, NULL);
         xTaskCreatePinnedToCore(&mongoose_task, "mongoose_task", 20480, NULL, 5, NULL, 0);
 
@@ -210,3 +216,69 @@ static void mongoose_ap_task(void *data) {
         mg_mgr_poll(&mgr, 1000);
     }
 }
+
+static void display_time_task(void *data) {
+    xEventGroupWaitBits(event_group, TIME_UPDATED_BIT, false, true, portMAX_DELAY);
+
+    char time[32];
+    struct timeval tv;
+
+    for(;;) {
+        gettimeofday(&tv, NULL);
+        // sprintf(time, "%d.%d", (int)tv.tv_sec, (int)tv.tv_usec);
+        sprintf(time, "%d", (int)tv.tv_sec);
+        display_draw_center(time);
+
+        vTaskDelay(333 / portTICK_PERIOD_MS);
+    }
+}
+
+// static const char *TAG = "ssd1306";
+
+// void task_test_SSD1306i2c(void *ignore) {
+//     xEventGroupWaitBits(event_group, TIME_UPDATED_BIT, false, true, portMAX_DELAY);
+
+//     char time[32];
+//     struct timeval tv;
+//     gettimeofday(&tv, NULL);
+//     // sprintf(time, "%d.%d", (int)tv.tv_sec, (int)tv.tv_usec);
+//     sprintf(time, "%d", (int)tv.tv_sec);
+
+// 	u8g2_esp32_hal_t u8g2_esp32_hal = U8G2_ESP32_HAL_DEFAULT;
+// 	u8g2_esp32_hal.sda   = PIN_SDA;
+// 	u8g2_esp32_hal.scl  = PIN_SCL;
+// 	u8g2_esp32_hal_init(u8g2_esp32_hal);
+
+
+// 	u8g2_t u8g2; // a structure which will contain all the data for one display
+// 	u8g2_Setup_sh1106_128x64_noname_f(
+// 		&u8g2,
+// 		U8G2_R0,
+// 		//u8x8_byte_sw_i2c,
+// 		u8g2_esp32_msg_i2c_cb,
+// 		u8g2_esp32_msg_i2c_and_delay_cb);  // init u8g2 structure
+// 	u8x8_SetI2CAddress(&u8g2.u8x8,0x78);
+
+// 	ESP_LOGI(TAG, "u8g2_InitDisplay");
+// 	u8g2_InitDisplay(&u8g2); // send init sequence to the display, display is in sleep mode after this,
+
+// 	ESP_LOGI(TAG, "u8g2_SetPowerSave");
+// 	u8g2_SetPowerSave(&u8g2, 0); // wake up display
+// 	ESP_LOGI(TAG, "u8g2_ClearBuffer");
+// 	// u8g2_ClearBuffer(&u8g2);
+// 	// ESP_LOGI(TAG, "u8g2_DrawBox");
+// 	// u8g2_DrawBox(&u8g2, 0, 26, 80,6);
+// 	// u8g2_DrawFrame(&u8g2, 0,26,100,6);
+
+// 	ESP_LOGI(TAG, "u8g2_SetFont");
+//     // u8g2_SetFontDirection(&u8g2, 1);
+//     u8g2_SetFont(&u8g2, u8g2_font_courR12_tr);
+// 	ESP_LOGI(TAG, "u8g2_DrawStr");
+//     u8g2_DrawStr(&u8g2, 0, 64, time);
+// 	ESP_LOGI(TAG, "u8g2_SendBuffer");
+// 	u8g2_SendBuffer(&u8g2);
+
+// 	ESP_LOGI(TAG, "All done!");
+
+// 	vTaskDelete(NULL);
+// }
