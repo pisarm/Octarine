@@ -2,6 +2,7 @@
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
 #include "apps/sntp/sntp.h"
+#include "driver/gpio.h"
 #include "esp_event_loop.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
@@ -45,9 +46,10 @@ void app_main() {
 
     char ssid[SSID_MAX];
     char password[PASSWORD_MAX];
+    int setupOverride = gpio_get_level(GPIO_NUM_16);
 
     // Wifi credentials not found - starting up AP
-    if (get_wifi_settings(ssid, password) != ESP_OK) {
+    if (get_wifi_settings(ssid, password) != ESP_OK || setupOverride == 1) {
         xTaskCreate(ap_task, "ap_task", 2048, (void *) 0, 10, NULL);        
         xTaskCreatePinnedToCore(mongoose_ap_task, "mongoose_ap_task", 20480, NULL, 5, NULL, 0);
     } else {
