@@ -7,7 +7,7 @@
 # SDK tool configuration
 #
 CONFIG_TOOLPREFIX="xtensa-esp32-elf-"
-CONFIG_PYTHON="python"
+CONFIG_PYTHON="/usr/local/bin/python2.7"
 
 #
 # Bootloader config
