@@ -1,6 +1,32 @@
-#include <freertos/FreeRTOS.h>
-#include <freertos/event_groups.h>
-#include <freertos/task.h>
+/*-
+ * Copyright (c) 2017 Flemming Pedersen
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
+#include "freertos/task.h"
 #include "apps/sntp/sntp.h"
 #include "driver/gpio.h"
 #include "esp_event_loop.h"
@@ -9,61 +35,73 @@
 #include "mongoose.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
+#include "mdns.h"
 
+#include "button.h"
 #include "display.h"
 #include "endpoints.h"
 #include "storage.h"
 
 const int WIFI_CONNECTED_BIT = BIT0;
-const int AP_START_BIT = BIT1;
+const int AP_STARTED_BIT = BIT1;
 const int TIME_UPDATED_BIT = BIT2;
 
-static EventGroupHandle_t event_group;
+static EventGroupHandle_t g_event_group;
+
+static char formatted_time[8];
+static char formatted_ip_addr[32]; 
+static char formatted_mac_addr[32];
 
 // Function prototypes
 
 static void setup_wifi(char *ssid, char *password);
-static void setup_sntp(void);
+static void setup_ap();
+static void start_mdns_service();
 
-static void ap_task(void *args);
 static void sntp_task(void* args);
-static void mongoose_task(void *data);
-static void mongoose_ap_task(void *data);
-static void display_time_task(void *data);
+static void http_task(void *data);
+static void update_display_time_task(void *data);
+static void update_display_status_task(void *args);
 
-static esp_err_t wifi_event_handler(void *ctx, system_event_t *event);
-static void mongoose_event_handler(struct mg_connection *nc, int ev, void *evData);
+static esp_err_t wifi_event_handler(void *, system_event_t *);
+static void http_event_handler(struct mg_connection *, int, void *);
 
 // Main
 
 void app_main() {
     nvs_flash_init();
-
-    display_init();    
+    button_init();
+    display_init();        
     display_draw_center("Octarine");
 
-    event_group = xEventGroupCreate();
+    g_event_group = xEventGroupCreate();
 
     char ssid[SSID_MAX];
     char password[PASSWORD_MAX];
-    int setupOverride = gpio_get_level(GPIO_NUM_16);
+    int setupOverride = gpio_get_level(BUTTON_GPIO);
 
     // Wifi credentials not found - starting up AP
-    if (get_wifi_settings(ssid, password) != ESP_OK || setupOverride == 1) {
-        xTaskCreate(ap_task, "ap_task", 2048, (void *) 0, 10, NULL);        
-        xTaskCreatePinnedToCore(mongoose_ap_task, "mongoose_ap_task", 20480, NULL, 5, NULL, 0);
+    if (load_wifi_credentials(ssid, password) != ESP_OK || setupOverride == 1) {
+        display_draw_line0_line1("Connect to", "'Octarine' AP");   
+        xTaskCreatePinnedToCore(&http_task, "http_task", 20480, NULL, 5, NULL, 0);
+
+        setup_ap();
     } else {
-        xTaskCreate(display_time_task, "display_time_task", 2048, (void *) 0, 10, NULL);
+        xTaskCreate(update_display_time_task, "update_display_time_task", 2048, (void *) 0, 10, NULL);
+        xTaskCreate(update_display_status_task, "update_display_status_task", 2048, (void *) 0, 10, NULL);
         xTaskCreate(sntp_task, "sntp_task", 2048, (void *) 0, 10, NULL);
-        xTaskCreatePinnedToCore(&mongoose_task, "mongoose_task", 20480, NULL, 5, NULL, 0);
+        xTaskCreate(button_task, "button_task", 2048, (void *) 0, 10, NULL);
+        xTaskCreate(display_task, "display_task", 3072, (void *) 0, 7, NULL);
+        xTaskCreatePinnedToCore(&http_task, "http_task", 20480, NULL, 5, NULL, 0);
 
         setup_wifi(ssid, password);
+        start_mdns_service();
     }
 }
 
 static void setup_wifi(char *ssid, char *password) {
     tcpip_adapter_init();
-    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, "Octarine");
+    
     ESP_ERROR_CHECK( esp_event_loop_init(wifi_event_handler, NULL) );
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
@@ -76,61 +114,17 @@ static void setup_wifi(char *ssid, char *password) {
     
     ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
     ESP_ERROR_CHECK( esp_wifi_start() );
+
+    ESP_ERROR_CHECK( tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, "Octarine") );
 }
 
-static void setup_sntp(void) {    
-    sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "pool.ntp.org");
-    sntp_init();
-}
-
-static esp_err_t ap_event_handler (void *ctx, system_event_t *event) {
-    switch (event->event_id) {
-        case SYSTEM_EVENT_AP_START:       
-        xEventGroupSetBits(event_group, AP_START_BIT);
-        break;
-
-        default:
-        break;
-    }
-
-    return ESP_OK;
-}
-
-static esp_err_t wifi_event_handler(void *ctx, system_event_t *event) {
-    switch(event->event_id) {
-    case SYSTEM_EVENT_STA_START:
-        esp_wifi_connect();
-        break;
-
-    case SYSTEM_EVENT_STA_GOT_IP:
-        xEventGroupSetBits(event_group, WIFI_CONNECTED_BIT);
-
-        break;
-
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-        // This is a workaround as ESP32 WiFi libs don't currently auto-reassociate.
-        esp_wifi_connect();
-        xEventGroupClearBits(event_group, WIFI_CONNECTED_BIT);
-        break;
-
-    default:
-        break;
-    }
-
-    return ESP_OK;
-}
-
-static void mongoose_event_handler(struct mg_connection *connection, int event, void *event_data) { }
-static void mongoose_ap_event_handler(struct mg_connection *nc, int ev, void *evData) { }
-
-static void ap_task(void *args) {
+static void setup_ap() {
     tcpip_adapter_init();
-    esp_event_loop_init(ap_event_handler, NULL);
+    ESP_ERROR_CHECK( esp_event_loop_init(wifi_event_handler, NULL) );
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    esp_wifi_init(&cfg);
-    esp_wifi_set_storage(WIFI_STORAGE_RAM);
-    esp_wifi_set_mode(WIFI_MODE_AP);
+    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
+    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
+    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_AP) );
     wifi_config_t ap_config = {
 	   .ap = {
 	      .ssid = "Octarine",
@@ -143,40 +137,84 @@ static void ap_task(void *args) {
 	      .beacon_interval = 100
 	   }
     };
-    esp_wifi_set_config(WIFI_IF_AP, &ap_config);
-	esp_wifi_start();    
-	
-	vTaskDelete(NULL);
+    ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_AP, &ap_config) );
+	ESP_ERROR_CHECK( esp_wifi_start() );    
 }
 
+mdns_server_t * mdns = NULL;
+
+static void start_mdns_service() {
+    xEventGroupWaitBits(g_event_group, WIFI_CONNECTED_BIT, false, true, portMAX_DELAY);
+
+    esp_err_t err = mdns_init(TCPIP_ADAPTER_IF_STA, &mdns);
+    if (err) {
+        return;
+    }
+
+    ESP_ERROR_CHECK( mdns_set_hostname(mdns, "Octarine") );
+    ESP_ERROR_CHECK( mdns_set_instance(mdns, "Octarine") );
+    ESP_ERROR_CHECK( mdns_service_add(mdns, "_http", "_tcp", 80) );
+    ESP_ERROR_CHECK( mdns_service_instance_set(mdns, "_http", "_tcp", "Octarine Web Interface") );
+}
+
+static esp_err_t wifi_event_handler(void *ctx, system_event_t *event) {
+    switch(event->event_id) {
+    case SYSTEM_EVENT_AP_START:       
+        xEventGroupSetBits(g_event_group, AP_STARTED_BIT);
+        break;
+
+    case SYSTEM_EVENT_STA_START:
+        esp_wifi_connect();
+        break;
+
+    case SYSTEM_EVENT_STA_GOT_IP:
+        xEventGroupSetBits(g_event_group, WIFI_CONNECTED_BIT);
+        break;
+
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        // This is a workaround as ESP32 WiFi libs don't currently auto-reassociate.
+        esp_wifi_connect();
+        xEventGroupClearBits(g_event_group, WIFI_CONNECTED_BIT);
+        break;
+
+    default:
+        break;
+    }
+
+    return ESP_OK;
+}
+
+static void http_event_handler(struct mg_connection *connection, int event, void *event_data) { }
+
 static void sntp_task(void* args) {
-    xEventGroupWaitBits(event_group, WIFI_CONNECTED_BIT, false, true, portMAX_DELAY);
-    setup_sntp();
+    xEventGroupWaitBits(g_event_group, WIFI_CONNECTED_BIT, false, true, portMAX_DELAY);
+    
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, "pool.ntp.org");
+    sntp_init();
 
     time_t now;
-
     int retry = 1;
     const int retry_count = 10;
 
     do {
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        printf("Getting system time (%d/%d)\n", retry, retry_count);
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+        // printf("Getting system time (%d/%d)\n", retry, retry_count);
         time(&now);
     } while((long long)now == 0 && ++retry < retry_count);
 
-    printf("Got time -> %lld\n", (long long)now);
-    xEventGroupSetBits(event_group, TIME_UPDATED_BIT);
-
+    xEventGroupSetBits(g_event_group, TIME_UPDATED_BIT);
+    
     vTaskDelete(NULL);
 }
 
-static void mongoose_task(void *data) {
-    xEventGroupWaitBits(event_group, WIFI_CONNECTED_BIT, false, true, portMAX_DELAY);
+static void http_task(void *data) {
+    xEventGroupWaitBits(g_event_group, WIFI_CONNECTED_BIT | AP_STARTED_BIT, false, false, portMAX_DELAY);
     
 	struct mg_mgr mgr;
 	mg_mgr_init(&mgr, NULL);
 
-	struct mg_connection *connection = mg_bind(&mgr, ":80", mongoose_event_handler);
+	struct mg_connection *connection = mg_bind(&mgr, ":80", http_event_handler);
 
     mg_register_http_endpoint(connection, "/", root_endpoint);
     mg_register_http_endpoint(connection, "/config", config_endpoint);
@@ -194,93 +232,44 @@ static void mongoose_task(void *data) {
 	}
 }
 
-static void mongoose_ap_task(void *data) {
-    xEventGroupWaitBits(event_group, AP_START_BIT, false, true, portMAX_DELAY);
+static void update_display_time_task(void *args) {
+    xEventGroupWaitBits(g_event_group, TIME_UPDATED_BIT | WIFI_CONNECTED_BIT, false, true, portMAX_DELAY);
 
-    struct mg_mgr mgr;
-    mg_mgr_init(&mgr, NULL);
-
-    struct mg_connection *connection = mg_bind(&mgr, ":80", mongoose_ap_event_handler);
-
-    mg_register_http_endpoint(connection, "/", ap_root_endpoint);
-    mg_register_http_endpoint(connection, "/config", config_endpoint);
-    mg_register_http_endpoint(connection, "/config/time", config_time_endpoint);
-    mg_register_http_endpoint(connection, "/config/wifi", config_wifi_endpoint);
-
-    if (connection == NULL) {
-        vTaskDelete(NULL);
-        return;
-    }
-
-    mg_set_protocol_http_websocket(connection);
-
+    time_t now;
+    struct tm timeinfo;
+    
     for(;;) {
-        mg_mgr_poll(&mgr, 1000);
+        char timezone[TIMEZONE_MAX];
+        if (load_timezone(timezone) == ESP_OK) {
+            setenv("TZ", timezone, 1);  
+            tzset();
+        } 
+
+        time(&now);
+        localtime_r(&now, &timeinfo);
+
+        strftime(formatted_time, sizeof(formatted_time), "%H.%M", &timeinfo);
+        display_time = formatted_time;
+
+        vTaskDelay(666 / portTICK_PERIOD_MS);
     }
 }
 
-static void display_time_task(void *data) {
-    xEventGroupWaitBits(event_group, TIME_UPDATED_BIT, false, true, portMAX_DELAY);
+static void update_display_status_task(void *args) {
+    xEventGroupWaitBits(g_event_group, TIME_UPDATED_BIT | WIFI_CONNECTED_BIT, false, true, portMAX_DELAY);
 
-    char time[32];
-    struct timeval tv;
+    tcpip_adapter_ip_info_t ipinfo;
+    tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ipinfo);
+    sprintf(formatted_ip_addr, IPSTR, IP2STR(&ipinfo.ip));
 
-    for(;;) {
-        gettimeofday(&tv, NULL);
-        // sprintf(time, "%d.%d", (int)tv.tv_sec, (int)tv.tv_usec);
-        sprintf(time, "%d", (int)tv.tv_sec);
-        display_draw_center(time);
+    display_ip_addr = formatted_ip_addr;
 
-        vTaskDelay(333 / portTICK_PERIOD_MS);
-    }
+    uint8_t mac_tmp[6];
+    esp_wifi_get_mac(ESP_IF_WIFI_STA, mac_tmp);
+    sprintf(formatted_mac_addr, MACSTR, MAC2STR(mac_tmp));
+    strupr(formatted_mac_addr);
+
+    display_mac_addr = formatted_mac_addr;
+
+    vTaskDelete(NULL);
 }
-
-// static const char *TAG = "ssd1306";
-
-// void task_test_SSD1306i2c(void *ignore) {
-//     xEventGroupWaitBits(event_group, TIME_UPDATED_BIT, false, true, portMAX_DELAY);
-
-//     char time[32];
-//     struct timeval tv;
-//     gettimeofday(&tv, NULL);
-//     // sprintf(time, "%d.%d", (int)tv.tv_sec, (int)tv.tv_usec);
-//     sprintf(time, "%d", (int)tv.tv_sec);
-
-// 	u8g2_esp32_hal_t u8g2_esp32_hal = U8G2_ESP32_HAL_DEFAULT;
-// 	u8g2_esp32_hal.sda   = PIN_SDA;
-// 	u8g2_esp32_hal.scl  = PIN_SCL;
-// 	u8g2_esp32_hal_init(u8g2_esp32_hal);
-
-
-// 	u8g2_t u8g2; // a structure which will contain all the data for one display
-// 	u8g2_Setup_sh1106_128x64_noname_f(
-// 		&u8g2,
-// 		U8G2_R0,
-// 		//u8x8_byte_sw_i2c,
-// 		u8g2_esp32_msg_i2c_cb,
-// 		u8g2_esp32_msg_i2c_and_delay_cb);  // init u8g2 structure
-// 	u8x8_SetI2CAddress(&u8g2.u8x8,0x78);
-
-// 	ESP_LOGI(TAG, "u8g2_InitDisplay");
-// 	u8g2_InitDisplay(&u8g2); // send init sequence to the display, display is in sleep mode after this,
-
-// 	ESP_LOGI(TAG, "u8g2_SetPowerSave");
-// 	u8g2_SetPowerSave(&u8g2, 0); // wake up display
-// 	ESP_LOGI(TAG, "u8g2_ClearBuffer");
-// 	// u8g2_ClearBuffer(&u8g2);
-// 	// ESP_LOGI(TAG, "u8g2_DrawBox");
-// 	// u8g2_DrawBox(&u8g2, 0, 26, 80,6);
-// 	// u8g2_DrawFrame(&u8g2, 0,26,100,6);
-
-// 	ESP_LOGI(TAG, "u8g2_SetFont");
-//     // u8g2_SetFontDirection(&u8g2, 1);
-//     u8g2_SetFont(&u8g2, u8g2_font_courR12_tr);
-// 	ESP_LOGI(TAG, "u8g2_DrawStr");
-//     u8g2_DrawStr(&u8g2, 0, 64, time);
-// 	ESP_LOGI(TAG, "u8g2_SendBuffer");
-// 	u8g2_SendBuffer(&u8g2);
-
-// 	ESP_LOGI(TAG, "All done!");
-
-// 	vTaskDelete(NULL);
-// }
