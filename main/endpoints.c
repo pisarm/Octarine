@@ -27,37 +27,34 @@
 #include "endpoints.h"
 
 #include "esp_system.h"
+#include "html.h"
 #include "storage.h"
 
 #define CONTENT_TYPE_HTML "Content-Type: text/html"
 
+inline int length_for_content(const char *content) {
+    return strlen(content) + strlen(html_template) - HTML_TEMPLATE_FORMATTER_COUNT;
+}
+
 void root_endpoint(struct mg_connection *connection, int event, void *event_data) {
-    char page[] = "<html><body><h1>Octarine</h1></body></html>";
-    int pageLength = strlen(page);
+    // int html_length = strlen(html_content_root) + strlen(html_template) - HTML_TEMPLATE_FORMATTER_COUNT;
 
-    mg_send_head(connection, 200, pageLength, CONTENT_TYPE_HTML);
-    mg_printf(connection, "%s", page);
+    mg_send_head(connection, 200, length_for_content(html_content_root), CONTENT_TYPE_HTML);
+    mg_printf(connection, html_template, html_content_root);
     connection->flags |= MG_F_SEND_AND_CLOSE;
 }
 
-void config_endpoint(struct mg_connection *connection, int event, void *event_data) {
-    char page[] = "<html><body><h1>Octarine</h1><p>Welcome</p><p><a href='config/time'>Time</a></p><p><a href='config/wifi'>Wifi</a></p></body></html>";
-    int pageLength = strlen(page);
-
-    mg_send_head(connection, 200, pageLength, CONTENT_TYPE_HTML);
-    mg_printf(connection, "%s", page);
-    connection->flags |= MG_F_SEND_AND_CLOSE;
-}
-// // store_timezone("CET-1CEST,M3.5.0/2,M10.5.0/3");
+// store_timezone("CET-1CEST,M3.5.0/2,M10.5.0/3");
+// https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
+// explains how to create a TZ string for a given timezone
 void config_time_endpoint(struct mg_connection *connection, int event, void *event_data) {
     struct http_message *hm = (struct http_message *)event_data;
 
     if (mg_vcmp(&hm->method, "GET") == 0) {
-        char page[] = "<html><body><h1>Octarine</h1><p>Enter default timezone.</p><p>CET-1CEST,M3.5.0/2,M10.5.0/3 is Europe/Copenhagen</p><br><form action=\"/config/time\" method=\"post\">timezone<br><input type=\"text\" name=\"timezone\" value=\"\"><br><input type=\"submit\" value=\"Set\"></form></body></html>";
-        int pageLength = strlen(page);
+        int html_length = strlen(html_content_config_time) + strlen(html_template) - HTML_TEMPLATE_FORMATTER_COUNT;
 
-        mg_send_head(connection, 200, pageLength, CONTENT_TYPE_HTML);
-        mg_printf(connection, "%s", page);
+        mg_send_head(connection, 200, html_length, CONTENT_TYPE_HTML);
+        mg_printf(connection, html_template, html_content_config_time);
         connection->flags |= MG_F_SEND_AND_CLOSE;
     } else if (mg_vcmp(&hm->method, "POST") == 0) {
         char page[] = "<html><body><h1>Octarine</h1><p>Time zone has been stored.</p></body></html>";
@@ -80,11 +77,14 @@ void config_wifi_endpoint(struct mg_connection *connection, int event, void *eve
     struct http_message *hm = (struct http_message *)event_data;    
 
     if (mg_vcmp(&hm->method, "GET") == 0) {
-        char page[] = "<html><body><h1>Octarine</h1><p>Enter the requisite WIFI credentials below.</p><br><form action=\"/config/wifi\" method=\"post\">SSID<br><input type=\"text\" name=\"ssid\" value=\"\"><br>Password<br><input type=\"text\" name=\"password\" value=\"\"><br><input type=\"submit\" value=\"Set\"></form></body></html>";
-        int pageLength = strlen(page);
+        // char page[] = "<html><body><h1>Octarine</h1><p>Enter the requisite WIFI credentials below.</p><br><form action=\"/config/wifi\" method=\"post\">SSID<br><input type=\"text\" name=\"ssid\" value=\"\"><br>Password<br><input type=\"text\" name=\"password\" value=\"\"><br><input type=\"submit\" value=\"Set\"></form></body></html>";
+        // int pageLength = strlen(page);
 
-        mg_send_head(connection, 200, pageLength, CONTENT_TYPE_HTML);
-        mg_printf(connection, "%s", page);
+        // mg_send_head(connection, 200, pageLength, CONTENT_TYPE_HTML);
+        // mg_printf(connection, "%s", page);
+        // connection->flags |= MG_F_SEND_AND_CLOSE;
+        mg_send_head(connection, 200, length_for_content(html_content_config_wifi), CONTENT_TYPE_HTML);
+        mg_printf(connection, html_template, html_content_config_wifi);
         connection->flags |= MG_F_SEND_AND_CLOSE;
       } else if (mg_vcmp(&hm->method, "POST") == 0) {
         char page[] = "<html><body><h1>Octarine</h1><p>Wifi credentials have been stored.</p><p>Your Octarine device will now reset.</p></body></html>";
