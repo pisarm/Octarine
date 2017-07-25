@@ -217,7 +217,7 @@ static void http_task(void *data) {
 	struct mg_connection *connection = mg_bind(&mgr, ":80", http_event_handler);
 
     mg_register_http_endpoint(connection, "/", root_endpoint);
-    mg_register_http_endpoint(connection, "/config", config_endpoint);
+    // mg_register_http_endpoint(connection, "/config", config_endpoint);
     mg_register_http_endpoint(connection, "/config/time", config_time_endpoint);
     mg_register_http_endpoint(connection, "/config/wifi", config_wifi_endpoint);
 
