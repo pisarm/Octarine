@@ -24,8 +24,8 @@
  * SUCH DAMAGE.
  */
  
-#ifndef DATA_H
-#define DATA_H
+#ifndef HTML_H
+#define HTML_H
 
 #define HTML_TEMPLATE_FORMATTER_COUNT 2
 
