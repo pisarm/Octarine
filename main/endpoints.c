@@ -44,9 +44,6 @@ void root_endpoint(struct mg_connection *connection, int event, void *event_data
     connection->flags |= MG_F_SEND_AND_CLOSE;
 }
 
-// store_timezone("CET-1CEST,M3.5.0/2,M10.5.0/3");
-// https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
-// explains how to create a TZ string for a given timezone
 void config_time_endpoint(struct mg_connection *connection, int event, void *event_data) {
     struct http_message *hm = (struct http_message *)event_data;
 
@@ -77,12 +74,6 @@ void config_wifi_endpoint(struct mg_connection *connection, int event, void *eve
     struct http_message *hm = (struct http_message *)event_data;    
 
     if (mg_vcmp(&hm->method, "GET") == 0) {
-        // char page[] = "<html><body><h1>Octarine</h1><p>Enter the requisite WIFI credentials below.</p><br><form action=\"/config/wifi\" method=\"post\">SSID<br><input type=\"text\" name=\"ssid\" value=\"\"><br>Password<br><input type=\"text\" name=\"password\" value=\"\"><br><input type=\"submit\" value=\"Set\"></form></body></html>";
-        // int pageLength = strlen(page);
-
-        // mg_send_head(connection, 200, pageLength, CONTENT_TYPE_HTML);
-        // mg_printf(connection, "%s", page);
-        // connection->flags |= MG_F_SEND_AND_CLOSE;
         mg_send_head(connection, 200, length_for_content(html_content_config_wifi), CONTENT_TYPE_HTML);
         mg_printf(connection, html_template, html_content_config_wifi);
         connection->flags |= MG_F_SEND_AND_CLOSE;
@@ -105,6 +96,17 @@ void config_wifi_endpoint(struct mg_connection *connection, int event, void *eve
 
         esp_restart();
       }
+}
+
+void about_endpoint(struct mg_connection *connection, int event, void *event_data) {
+    char *content = malloc(512);    //FIXME: this is a guess - calculate this to avoid surprises
+    sprintf(content, html_content_about, esp_get_idf_version(), esp_get_free_heap_size());
+
+    mg_send_head(connection, 200, length_for_content(content), CONTENT_TYPE_HTML);
+    mg_printf(connection, html_template, content);
+    connection->flags |= MG_F_SEND_AND_CLOSE;
+    
+    free(content);
 }
 
 // void config_root_endpoint(struct mg_connection *nc, int ev, void *ev_data) {

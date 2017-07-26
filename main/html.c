@@ -85,6 +85,7 @@ const char *html_template = "<!DOCTYPE html>"
                             "<a href='/config/wifi'>WIFI</a>"
                             "</div>"
                             "</li>"
+                            "<li><a href='/about'>ABOUT</a></li>"
                             "</ul>"
                             "%s"
                             "</body>"
@@ -112,3 +113,6 @@ const char *html_content_config_wifi = "<p>Enter the requisite WIFI credentials 
                                        "<input type='text' name='password' value=''><br>"
                                        "<input type='submit' value='Set'>"
                                        "</form>";
+
+const char *html_content_about = "<p>ESP-IDF %s</p>"
+                                 "<p>Free heap: %u bytes</p>";
