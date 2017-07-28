@@ -57,7 +57,7 @@ void config_time_endpoint(struct mg_connection *connection, int event, void *eve
         char page[] = "<html><body><h1>Octarine</h1><p>Time zone has been stored.</p></body></html>";
         int pageLength = strlen(page);
 
-        char timezone[TIMEZONE_MAX];
+        char timezone[STORAGE_TIMEZONE_MAX];
         mg_get_http_var(&hm->body, "timezone", timezone, sizeof(timezone));
 
         if (store_timezone(timezone) != ESP_OK) {
@@ -81,8 +81,8 @@ void config_wifi_endpoint(struct mg_connection *connection, int event, void *eve
         char page[] = "<html><body><h1>Octarine</h1><p>Wifi credentials have been stored.</p><p>Your Octarine device will now reset.</p></body></html>";
         int pageLength = strlen(page);
 
-        char ssid[SSID_MAX];
-        char password[PASSWORD_MAX];
+        char ssid[STORAGE_WIFI_SSID_MAX];
+        char password[STORAGE_WIFI_PASSWORD_MAX];
         mg_get_http_var(&hm->body, "ssid", ssid, sizeof(ssid));
         mg_get_http_var(&hm->body, "password", password, sizeof(password));
 

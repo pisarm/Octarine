@@ -29,9 +29,9 @@
 #include "nvs.h"
 
 #define STORAGE "storage"
-#define STORAGE_SSID "ssid"
-#define STORAGE_PASSWORD "password"
-#define STORAGE_KEY_TIMEZONE "timezone"
+#define WIFI_SSID_KEY "ssid"
+#define WIFI_PASSWORD_KEY "password"
+#define TIMEZONE_KEY "timezone"
 #define TRAFFIC_DESTINATION_KEY "traffic_destnation"
 #define TRAFFIC_ORIGIN_KEY "traffic_origin"
 
@@ -66,12 +66,12 @@ esp_err_t store(char *storage_key, char *storage_value) {
 }
 
 esp_err_t load_timezone(char *timezone) {
-    size_t length = TIMEZONE_MAX;    
-    return load(STORAGE_KEY_TIMEZONE, timezone, length);
+    size_t length = STORAGE_TIMEZONE_MAX;    
+    return load(TIMEZONE_KEY, timezone, length);
 }
 
 esp_err_t store_timezone(char *timezone) {
-    return store(STORAGE_KEY_TIMEZONE, timezone);
+    return store(TIMEZONE_KEY, timezone);
 }
 
 esp_err_t load_traffic_destination(char *destination) {
@@ -96,15 +96,15 @@ esp_err_t load_wifi_credentials(char *ssid, char *password) {
     nvs_handle storage_handle;
     nvs_open(STORAGE, NVS_READONLY, &storage_handle);
 
-    size_t length = SSID_MAX;
-    esp_err_t status = nvs_get_str(storage_handle, STORAGE_SSID, ssid, &length);
+    size_t length = STORAGE_WIFI_SSID_MAX;
+    esp_err_t status = nvs_get_str(storage_handle, WIFI_SSID_KEY, ssid, &length);
     if (status != ESP_OK) {    
         nvs_close(storage_handle);
         return status;
     }
 
-    length = PASSWORD_MAX;
-    status = nvs_get_str(storage_handle, STORAGE_PASSWORD, password, &length);
+    length = STORAGE_WIFI_PASSWORD_MAX;
+    status = nvs_get_str(storage_handle, WIFI_PASSWORD_KEY, password, &length);
     if (status != ESP_OK) {
         nvs_close(storage_handle);
         return status;
@@ -119,12 +119,12 @@ esp_err_t store_wifi_credentials(char *ssid, char *password) {
     nvs_handle storage_handle;
     nvs_open(STORAGE, NVS_READWRITE, &storage_handle);
 
-    esp_err_t status = nvs_set_str(storage_handle, STORAGE_SSID, ssid);
+    esp_err_t status = nvs_set_str(storage_handle, WIFI_SSID_KEY, ssid);
     if (status != ESP_OK) {
         return status;
     }
 
-    status = nvs_set_str(storage_handle, STORAGE_PASSWORD, password);
+    status = nvs_set_str(storage_handle, WIFI_PASSWORD_KEY, password);
     if (status != ESP_OK) {
         return status;
     }

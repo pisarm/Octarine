@@ -76,8 +76,8 @@ void app_main() {
 
     g_event_group = xEventGroupCreate();
 
-    char ssid[SSID_MAX];
-    char password[PASSWORD_MAX];
+    char ssid[STORAGE_WIFI_SSID_MAX];
+    char password[STORAGE_WIFI_PASSWORD_MAX];
     int setupOverride = gpio_get_level(BUTTON_GPIO);
 
     // Wifi credentials not found - starting up AP
@@ -239,7 +239,7 @@ static void update_display_time_task(void *args) {
     struct tm timeinfo;
     
     for(;;) {
-        char timezone[TIMEZONE_MAX];
+        char timezone[STORAGE_TIMEZONE_MAX];
         if (load_timezone(timezone) == ESP_OK) {
             setenv("TZ", timezone, 1);  
             tzset();
