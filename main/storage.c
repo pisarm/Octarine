@@ -32,6 +32,8 @@
 #define STORAGE_SSID "ssid"
 #define STORAGE_PASSWORD "password"
 #define STORAGE_KEY_TIMEZONE "timezone"
+#define TRAFFIC_DESTINATION_KEY "traffic_destnation"
+#define TRAFFIC_ORIGIN_KEY "traffic_origin"
 
 esp_err_t load(char *storage_key, char *storage_value, size_t length) {
     nvs_handle storage_handle;
@@ -70,6 +72,24 @@ esp_err_t load_timezone(char *timezone) {
 
 esp_err_t store_timezone(char *timezone) {
     return store(STORAGE_KEY_TIMEZONE, timezone);
+}
+
+esp_err_t load_traffic_destination(char *destination) {
+    size_t length = STORAGE_TRAFFIC_DESTINATION_MAX;
+    return load(TRAFFIC_DESTINATION_KEY, destination, length);
+}
+
+esp_err_t store_traffic_destination(char *destination) {
+    return store(TRAFFIC_DESTINATION_KEY, destination);
+}
+
+esp_err_t load_traffic_origin(char *origin) {
+    size_t length = STORAGE_TRAFFIC_ORIGIN_MAX;
+    return load(TRAFFIC_ORIGIN_KEY, origin, length);
+}
+
+esp_err_t store_traffic_origin(char *origin) {
+    return store(TRAFFIC_ORIGIN_KEY, origin);
 }
 
 esp_err_t load_wifi_credentials(char *ssid, char *password) {
