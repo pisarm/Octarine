@@ -36,6 +36,14 @@ inline int length_for_content(const char *content) {
     return strlen(content) + strlen(html_template) - HTML_TEMPLATE_FORMATTER_COUNT;
 }
 
+struct Endpoint ENDPOINTS_TO_REGISTER[ENDPOINT_COUNT] = {
+    { .uri_path = "/", .handler = root_endpoint },
+    { .uri_path = "/config/time", .handler = config_time_endpoint },
+    { .uri_path = "/config/transit", .handler = config_transit_endpoint },
+    { .uri_path = "/config/wifi", .handler = config_wifi_endpoint },
+    { .uri_path = "/about", .handler = about_endpoint }
+};
+
 void root_endpoint(struct mg_connection *connection, int event, void *event_data) {
     // int html_length = strlen(html_content_root) + strlen(html_template) - HTML_TEMPLATE_FORMATTER_COUNT;
 
@@ -74,7 +82,9 @@ void config_transit_endpoint(struct mg_connection *connection, int event, void *
     struct http_message *hm = (struct http_message *)event_data;
 
     if (mg_vcmp(&hm->method, "GET") == 0) {
-     
+        mg_send_head(connection, 200, length_for_content(html_content_config_transit), CONTENT_TYPE_HTML);
+        mg_printf(connection, html_template, html_content_config_transit);
+        connection->flags |= MG_F_SEND_AND_CLOSE;     
     } else if (mg_vcmp(&hm->method, "POST") == 0) {
      
     }

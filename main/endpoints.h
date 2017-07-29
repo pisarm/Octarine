@@ -29,6 +29,15 @@
 
 #include "mongoose.h"
 
+#define ENDPOINT_COUNT 5
+
+struct Endpoint {
+    const char *uri_path;
+    mg_event_handler_t handler;
+};
+
+extern struct Endpoint ENDPOINTS_TO_REGISTER[ENDPOINT_COUNT];
+
 void root_endpoint(struct mg_connection *, int, void *);
 void config_time_endpoint(struct mg_connection *, int, void *);
 void config_transit_endpoint(struct mg_connection *, int, void *);

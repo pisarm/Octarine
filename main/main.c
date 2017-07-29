@@ -199,7 +199,6 @@ static void sntp_task(void* args) {
 
     do {
         vTaskDelay(500 / portTICK_PERIOD_MS);
-        // printf("Getting system time (%d/%d)\n", retry, retry_count);
         time(&now);
     } while((long long)now == 0 && ++retry < retry_count);
 
@@ -216,10 +215,10 @@ static void http_task(void *data) {
 
 	struct mg_connection *connection = mg_bind(&mgr, ":80", http_event_handler);
 
-    mg_register_http_endpoint(connection, "/", root_endpoint);
-    mg_register_http_endpoint(connection, "/config/time", config_time_endpoint);
-    mg_register_http_endpoint(connection, "/config/wifi", config_wifi_endpoint);
-    mg_register_http_endpoint(connection, "/about", about_endpoint);
+    struct Endpoint* ptr = ENDPOINTS_TO_REGISTER;
+    for (int i=0; i < ENDPOINT_COUNT; ++i, ++ptr ) {
+        mg_register_http_endpoint(connection, ptr->uri_path, ptr->handler);
+    }
 
 	if (connection == NULL) {
 		vTaskDelete(NULL);
