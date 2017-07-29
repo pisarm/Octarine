@@ -29,11 +29,12 @@
 #include "nvs.h"
 
 #define STORAGE "storage"
-#define WIFI_SSID_KEY "ssid"
-#define WIFI_PASSWORD_KEY "password"
+
 #define TIMEZONE_KEY "timezone"
-#define TRAFFIC_DESTINATION_KEY "traffic_destnation"
-#define TRAFFIC_ORIGIN_KEY "traffic_origin"
+#define TRANSIT_DESTINATION_KEY "transit_destination"
+#define TRANSIT_ORIGIN_KEY "transit_origin"
+#define WIFI_PASSWORD_KEY "wifi_password"
+#define WIFI_SSID_KEY "wifi_ssid"
 
 esp_err_t load(char *storage_key, char *storage_value, size_t length) {
     nvs_handle storage_handle;
@@ -74,22 +75,22 @@ esp_err_t store_timezone(char *timezone) {
     return store(TIMEZONE_KEY, timezone);
 }
 
-esp_err_t load_traffic_destination(char *destination) {
-    size_t length = STORAGE_TRAFFIC_DESTINATION_MAX;
-    return load(TRAFFIC_DESTINATION_KEY, destination, length);
+esp_err_t load_transit_destination(char *destination) {
+    size_t length = STORAGE_TRANSIT_DESTINATION_MAX;
+    return load(TRANSIT_DESTINATION_KEY, destination, length);
 }
 
-esp_err_t store_traffic_destination(char *destination) {
-    return store(TRAFFIC_DESTINATION_KEY, destination);
+esp_err_t store_transit_destination(char *destination) {
+    return store(TRANSIT_DESTINATION_KEY, destination);
 }
 
-esp_err_t load_traffic_origin(char *origin) {
-    size_t length = STORAGE_TRAFFIC_ORIGIN_MAX;
-    return load(TRAFFIC_ORIGIN_KEY, origin, length);
+esp_err_t load_transit_origin(char *origin) {
+    size_t length = STORAGE_TRANSIT_ORIGIN_MAX;
+    return load(TRANSIT_ORIGIN_KEY, origin, length);
 }
 
-esp_err_t store_traffic_origin(char *origin) {
-    return store(TRAFFIC_ORIGIN_KEY, origin);
+esp_err_t store_transit_origin(char *origin) {
+    return store(TRANSIT_ORIGIN_KEY, origin);
 }
 
 esp_err_t load_wifi_credentials(char *ssid, char *password) {

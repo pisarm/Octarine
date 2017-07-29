@@ -32,17 +32,17 @@
 #define STORAGE_TIMEZONE_MAX 32
 #define STORAGE_WIFI_SSID_MAX 32
 #define STORAGE_WIFI_PASSWORD_MAX 64
-#define STORAGE_TRAFFIC_DESTINATION_MAX 64
-#define STORAGE_TRAFFIC_ORIGIN_MAX 64
+#define STORAGE_TRANSIT_DESTINATION_MAX 64
+#define STORAGE_TRANSIT_ORIGIN_MAX 64
 
 esp_err_t load_timezone(char *timezone);
 esp_err_t store_timezone(char *timezone);
 
-esp_err_t load_traffic_destination(char *destination);
-esp_err_t store_traffic_destination(char *destination);
+esp_err_t load_transit_destination(char *destination);
+esp_err_t store_transit_destination(char *destination);
 
-esp_err_t load_traffic_origin(char *origin);
-esp_err_t store_traffic_origin(char *origin);
+esp_err_t load_transit_origin(char *origin);
+esp_err_t store_transit_origin(char *origin);
 
 esp_err_t load_wifi_credentials(char *ssid, char *password);
 esp_err_t store_wifi_credentials(char *ssid, char *password);

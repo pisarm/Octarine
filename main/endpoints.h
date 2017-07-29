@@ -31,7 +31,7 @@
 
 void root_endpoint(struct mg_connection *, int, void *);
 void config_time_endpoint(struct mg_connection *, int, void *);
-void config_traffic_endpoint(struct mg_connection *, int, void *);
+void config_transit_endpoint(struct mg_connection *, int, void *);
 void config_wifi_endpoint(struct mg_connection *, int, void *);
 void about_endpoint(struct mg_connection *, int, void *);
 

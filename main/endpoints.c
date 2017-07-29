@@ -70,7 +70,7 @@ void config_time_endpoint(struct mg_connection *connection, int event, void *eve
     }
 }
 
-void config_traffic_endpoint(struct mg_connection *, int, void *) {
+void config_transit_endpoint(struct mg_connection *connection, int event, void *event_data) {
     struct http_message *hm = (struct http_message *)event_data;
 
     if (mg_vcmp(&hm->method, "GET") == 0) {
