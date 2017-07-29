@@ -33,6 +33,7 @@ extern const char *html_template;
 
 extern const char *html_content_root;
 extern const char *html_content_config_time;
+extern const char *html_content_config_transit;
 extern const char *html_content_config_wifi;
 extern const char *html_content_about;
 

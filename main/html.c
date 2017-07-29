@@ -82,6 +82,7 @@ const char *html_template = "<!DOCTYPE html>"
                             "<a href='javascript:void(0)' class='dropbtn'>CONFIG</a>"
                             "<div class='dropdown-content'>"
                             "<a href='/config/time'>TIME</a>"
+                            "<a href='/config/transit'>TRANSIT</a>"
                             "<a href='/config/wifi'>WIFI</a>"
                             "</div>"
                             "</li>"
@@ -106,6 +107,19 @@ const char *html_content_config_time = "<p><h3>Input TZ time zone variable:</h3>
                                        "<br>"
                                        "<p><h3>Examples</h3></p>"
                                        "<p>CET-1CEST,M3.5.0/2,M10.5.0/3 is Europe/Copenhagen (including intervals for Daylight Saving Time)</p>";
+
+const char *html_content_config_transit = "<p>Enter origin and destination for calculating transit time.</p>"
+                                          "<form action='/config/transit' method='post'>"
+                                          "Origin"
+                                          "<br>"
+                                          "<input type='text' name='origin' value=''>"
+                                          "<br>"
+                                          "Destination"
+                                          "<br>"
+                                          "<input type='text' name='password' value=''>"
+                                          "<br>"
+                                          "<input type='submit' value='Set'>"
+                                          "</form>";
 
 const char *html_content_config_wifi = "<p>Enter the requisite WIFI credentials below.</p>"
                                        "<form action='/config/wifi' method='post'>SSID<br>"
