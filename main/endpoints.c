@@ -36,7 +36,7 @@ inline int length_for_content(const char *content) {
     return strlen(content) + strlen(html_template) - HTML_TEMPLATE_FORMATTER_COUNT;
 }
 
-struct Endpoint ENDPOINTS_TO_REGISTER[ENDPOINT_COUNT] = {
+endpoint_t ENDPOINTS_TO_REGISTER[ENDPOINT_COUNT] = {
     { .uri_path = "/", .handler = root_endpoint },
     { .uri_path = "/config/time", .handler = config_time_endpoint },
     { .uri_path = "/config/transit", .handler = config_transit_endpoint },

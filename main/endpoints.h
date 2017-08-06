@@ -31,12 +31,12 @@
 
 #define ENDPOINT_COUNT 5
 
-struct Endpoint {
+typedef struct endpoint_t {
     const char *uri_path;
     mg_event_handler_t handler;
-};
+} endpoint_t;
 
-extern struct Endpoint ENDPOINTS_TO_REGISTER[ENDPOINT_COUNT];
+extern endpoint_t ENDPOINTS_TO_REGISTER[ENDPOINT_COUNT];
 
 void root_endpoint(struct mg_connection *, int, void *);
 void config_time_endpoint(struct mg_connection *, int, void *);
