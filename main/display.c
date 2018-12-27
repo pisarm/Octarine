@@ -109,10 +109,17 @@ void display_task(void *args) {
 
             u8g2_ClearBuffer(&display);
             u8g2_SetFont(&display, u8g2_font_freedoomr25_mn);
-            u8g2_SetFontPosCenter(&display);
+            // u8g2_SetFontPosCenter(&display);
+            u8g2_SetFontPosTop(&display);
             u8g2_uint_t width = u8g2_GetStrWidth(&display, display_time);
 
-            u8g2_DrawStr(&display, (display_width-width)/2, display_height/2, display_time);
+            u8g2_DrawStr(&display, (display_width-width)/2, 2, display_time);
+            // u8g2_DrawFrame(&display, 0, 0, 128, 64);
+
+            u8g2_SetFont(&display, u8g2_font_6x10_mf);
+            u8g2_DrawStr(&display, 32, 32, "53 mins");
+            u8g2_DrawStr(&display, 32, 48, "Snow incoming");
+
             u8g2_SendBuffer(&display);
             break;
 

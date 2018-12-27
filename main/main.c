@@ -37,10 +37,19 @@
 #include "esp_log.h"
 #include "mdns.h"
 
+#include "mbedtls/platform.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/debug.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/error.h"
+#include "mbedtls/net.h"
+#include "mbedtls/ssl.h"
+
 #include "button.h"
 #include "display.h"
 #include "endpoints.h"
 #include "storage.h"
+#include "weather.h"
 
 const int WIFI_CONNECTED_BIT = BIT0;
 const int AP_STARTED_BIT = BIT1;
@@ -58,10 +67,11 @@ static void setup_wifi(char *ssid, char *password);
 static void setup_ap();
 static void start_mdns_service();
 
-static void sntp_task(void* args);
-static void http_task(void *data);
-static void update_display_time_task(void *data);
-static void update_display_status_task(void *args);
+static void sntp_task(void *);
+static void http_task(void *);
+static void update_display_time_task(void *);
+static void update_display_status_task(void *);
+static void request_test_task(void *);
 
 static esp_err_t wifi_event_handler(void *, system_event_t *);
 static void http_event_handler(struct mg_connection *, int, void *);
@@ -88,11 +98,13 @@ void app_main() {
         setup_ap();
     } else {
         xTaskCreate(update_display_time_task, "update_display_time_task", 2048, (void *) 0, 10, NULL);
-        xTaskCreate(update_display_status_task, "update_display_status_task", 2048, (void *) 0, 10, NULL);
+        xTaskCreate(update_display_status_task, "update_display_status_task", 2048, (void *) 0, 10, NULL);        
+        xTaskCreate(request_test_task, "request_test_task", 15360, (void *) 0, 10, NULL);
         xTaskCreate(sntp_task, "sntp_task", 2048, (void *) 0, 10, NULL);
         xTaskCreate(button_task, "button_task", 2048, (void *) 0, 10, NULL);
         xTaskCreate(display_task, "display_task", 3072, (void *) 0, 7, NULL);
         xTaskCreatePinnedToCore(&http_task, "http_task", 20480, NULL, 5, NULL, 0);
+        
 
         setup_wifi(ssid, password);
         start_mdns_service();
@@ -215,7 +227,7 @@ static void http_task(void *data) {
 
 	struct mg_connection *connection = mg_bind(&mgr, ":80", http_event_handler);
 
-    struct Endpoint* ptr = ENDPOINTS_TO_REGISTER;
+    endpoint_t *ptr = ENDPOINTS_TO_REGISTER;
     for (int i=0; i < ENDPOINT_COUNT; ++i, ++ptr ) {
         mg_register_http_endpoint(connection, ptr->uri_path, ptr->handler);
     }
@@ -269,6 +281,26 @@ static void update_display_status_task(void *args) {
     strupr(formatted_mac_addr);
 
     display_mac_addr = formatted_mac_addr;
+
+    vTaskDelete(NULL);
+}
+
+void updated_weather_data(weather_data_t *weather_data) {
+    printf("Summary: %s\nTemperature: %f\nPrecipitation: %f", weather_data->summary, weather_data->temperature, weather_data->precip_probability);
+}
+
+static void request_test_task(void *args) {
+    xEventGroupWaitBits(g_event_group, WIFI_CONNECTED_BIT, false, true, portMAX_DELAY);
+
+    weather_config_t weather_config = {
+        .secret_key = "a82b45701a65114ca0e7c051021c4090",
+        .latitude = 55.71,
+        .longitude = 9.53
+    };
+
+    init_weather(weather_config, &updated_weather_data);
+
+    xTaskCreate(weather_request_task, "weather_request_task", 10240, (void *) 0, 10, NULL);
 
     vTaskDelete(NULL);
 }
